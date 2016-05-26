@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <sys/time.h>
 #include "camera.h"
 #include "geometry.h"
 #include "scene.h"
@@ -16,31 +17,36 @@ int main(int argc, char** argv)
 {
     Vec3d f = Vec3d(0, 1, 0);
     Vec3d right = f.cross(Vec3d(0, 0, 1));
-    Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 22.5/28.0, 22.5);
+    Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 18/32.0, 18);
     Scene scene(Point3d(0, 0, 3));
-    Plain* plain = new Plain(Vec3d(0, 1, 0), Point3d(0, 6, 0), TEST_material_SQ);
-    Plain* plain2 = new Plain(Vec3d(0, 0, 1), Point3d(0, 0, 6), TEST_material4);
-    Plain* plain3 = new Plain(Vec3d(0, 0, 1), Point3d(0, 0, -6), TEST_material4);
-    Plain* plain4 = new Plain(Vec3d(1, 0, 0), Point3d(6, 0, 0), TEST_material2);
-    Plain* plain5 = new Plain(Vec3d(1, 0, 0), Point3d(-6, 0, 0), TEST_material3);
-    //Plain* plain6 = new Plain(Vec3d(0, 1, 0), Point3d(0, -10, 0), TEST_material4);
-    Sphere* sphere = new Sphere(Point3d(2, -2, -6+2.3), 2.3, BALL_material_REFR);
-    Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -4), 2, BALL_material);
-    Sphere* spherelight = new Sphere(Point3d(0, 0, 6+100), 100+0.015, LIGHT_material);
+    // Plain* plain = new Plain(Vec3d(0, 1, 0), Point3d(0, 6, 0), SQUARE_WALL);
+    Rectangle* plain = new Rectangle(Point3d(-6, 6, 6), Point3d(6, 6, 6),Point3d(6, 6, -6), Point3d(-6, 6, -6), PIC_WALL, "ussr2.png");
+    Plain* plain2 = new Plain(Vec3d(0, 0, 1), Point3d(0, 0, 6), WHITE_WALL);
+    Rectangle* plain3 = new Rectangle(Point3d(-6, 6, -6), Point3d(6, 6, -6), Point3d(6, -20, -6), Point3d(-6, -20, -6), PIC_FLOOR, "wood2.jpg");
+    Plain* plain4 = new Plain(Vec3d(1, 0, 0), Point3d(6, 0, 0), BLUE_WALL);
+    Plain* plain5 = new Plain(Vec3d(1, 0, 0), Point3d(-6, 0, 0), RED_WALL);
+    Plain* plain6 = new Plain(Vec3d(0, 1, 0), Point3d(0, -25, 0), WHITE_WALL);
+    // Sphere* sphere = new Sphere(Point3d(2, -2, -6+2.3), 2.3, BALL_material_REFR);
+    Sphere* sphere = new Sphere(Point3d(2, -2, -6+1.5), 1.5, BALL_material_REFR);
+    Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -6+2+6), 2, PIC_BALL, "world-physical-map.jpg");
+    Rectangle* spherelight = new Rectangle(Point3d(-2, 2, 5.999), Point3d(2, 2, 5.999),Point3d(2, -2, 5.999),Point3d(-2, -2, 5.999), LIGHT_material);
     scene.AddGeometry(plain);
     scene.AddGeometry(plain2);
     scene.AddGeometry(plain3);
     scene.AddGeometry(plain4);
     scene.AddGeometry(plain5);
-    //scene.AddGeometry(plain6);
+    scene.AddGeometry(plain6);
     scene.AddGeometry(sphere);
     scene.AddGeometry(sphere2);
     scene.AddGeometry(spherelight);
     Mat pic(512, 512, CV_64FC3);
     const double dx[4] = {0, 0.5, 0, 0.5};
     const double dy[4] = {0, 0, 0.5, 0.5};
-    const int samplenum = 5000; const double piecesample = 1.0 / samplenum;
-#pragma omp parallel for schedule(dynamic, 1)
+    const int samplenum = 100; const double piecesample = 1.0 / samplenum;
+    int finished_pixel = 0;
+    timeval starttime, endtime; double timeuse = 0, timeleft = 0, percentf = 0; int hour = 0, minute = 0;
+    gettimeofday(&starttime, NULL);
+#pragma omp parallel for schedule(dynamic, 1) shared(finished_pixel, starttime, endtime, timeuse, timeleft, hour, minute)
     for (int i = 0; i < pic.rows; ++i) {
         unsigned short Xi[3] = {0, 0, i * i * i};
         for (int j = 0; j < pic.cols; ++j) {
@@ -56,6 +62,18 @@ int main(int argc, char** argv)
                     tempv += ((scene.MCRayTracing(camera.ray_direction(sx, sy, Xi), 0, Xi)) * piecesample);
                 }
                 p[j] += truncvec(tempv) * 0.25;
+            }
+#pragma omp critical
+            {
+                ++finished_pixel;
+                if (finished_pixel % 10 == 0) {
+                    gettimeofday(&endtime, NULL);
+                    timeuse = endtime.tv_sec - starttime.tv_sec + (endtime.tv_usec - starttime.tv_usec) / 1000000.0;
+                    percentf = (double)finished_pixel / (double)(pic.rows * pic.cols);
+                    timeleft = timeuse * (1.0 / percentf - 1);
+                    printf("Finished %.2f%% ...    time usage: %dh%dm%ds    timeleft: %dh%dm%ds      \r", percentf * 100.0, (int)timeuse/3600, ((int)(timeuse)%3600)/60, ((int)(timeuse)%3600)%60, (int)timeleft/3600, ((int)(timeleft)%3600)/60, ((int)(timeleft)%3600)%60);
+                    fflush(stdout);
+                }
             }
         }
     }

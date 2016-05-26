@@ -1,7 +1,7 @@
 #include "scene.h"
 #include <iostream>
 
-
+/*
 Vec3d Scene::RayTracing(const Ray& ray, double weight, int tracetime) {
     if (tracetime == 0)
         return Vec3d(0, 0, 0);
@@ -41,6 +41,7 @@ Vec3d Scene::RayTracing(const Ray& ray, double weight, int tracetime) {
     }
     return localcolor + mingeo->material().Kso * refcolor;
 }
+*/
 
 Vec3d Scene::MCRayTracing(const Ray &ray, int tracetime, unsigned short* Xi) {
     double mint = 1e10;
@@ -56,16 +57,41 @@ Vec3d Scene::MCRayTracing(const Ray &ray, int tracetime, unsigned short* Xi) {
         return Vec3d(0, 0, 0);
     mint -= EPS;
     Vec3d pointcolor = mingeo->texture(ray, mint);
+    Vec3d basecolor = mingeo->material().selflight;
+
     if (tracetime > MAXTIME) {
         double r = erand48(Xi);
         double cp = 0;
         for (int i = 0; i < 3; ++i)
             if (pointcolor[i] > cp)
                 cp = pointcolor[i];
-        if (r > cp)
-            return mingeo->material().selflight;
+        if (r > cp) {
+            for (int i = 0; i < geometry_vec.size(); ++i) {
+                if (geometry_vec[i]->material().selflight != Vec3d(0, 0, 0)) {
+                    const Geometry* geo = geometry_vec[i];
+                    Point3d plight = geo->randpointforlight(Xi);
+                    double targett = norm(ray.p(mint) - plight);
+                    Ray light(plight, ray.p(mint) - plight, ray.into);
+                    bool blocked = false;
+                    for (int j = 0; j < geometry_vec.size(); ++j) {
+                        if ((geometry_vec[j]) != (geo)) {
+                            double testlight = geometry_vec[j]->intersect(light);
+                            if (testlight > 0 && testlight < targett) {
+                                blocked = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!blocked) {
+                        basecolor += mingeo->color(ray, mint, light,(geo->material().selflight), Vec3d(0, 0, 0));
+                    }
+                }
+            }
+            return basecolor;
+        }
     }
-    if (mingeo->material().type == DIFF) {
+    TYPE raytype = mingeo->raytype(Xi);
+    if (raytype == DIFF) {
         double theta = 2 * M_PI * erand48(Xi), rxy = erand48(Xi), rxys = sqrt(rxy);
         Vec3d nv = mingeo->n_vec(ray, mint);
         Vec3d xaxis;
@@ -75,22 +101,44 @@ Vec3d Scene::MCRayTracing(const Ray &ray, int tracetime, unsigned short* Xi) {
             xaxis = normalize(nv.cross(Vec3d(1, 0, 0)));
         Vec3d yaxis = normalize(nv.cross(xaxis));
         Vec3d d = normalize(xaxis * rxys * cos(theta) + yaxis * rxys * sin(theta) + nv * sqrt(1 - rxy));
-        return (mingeo->material().selflight + pointcolor.mul(MCRayTracing(Ray(ray.p(mint), d), tracetime + 1, Xi)));
+        // Direct light item
+//        Vec3d dirlight = Vec3d(0, 0, 0);
+//        for (int i = 0; i < geometry_vec.size(); ++i) {
+//            if (geometry_vec[i]->material().selflight != Vec3d(0, 0, 0)) {
+//                const Geometry* geo = geometry_vec[i];
+//                Point3d plight = geo->randpointforlight(Xi);
+//                double targett = norm(ray.p(mint) - plight);
+//                Ray light(plight, ray.p(mint) - plight, ray.into);
+//                bool blocked = false;
+//                for (int j = 0; j < geometry_vec.size(); ++j) {
+//                    if ((geometry_vec[j]) != (geo)) {
+//                        double testlight = geometry_vec[j]->intersect(light);
+//                        if (testlight > 0 && testlight < targett) {
+//                            blocked = true;
+//                            break;
+//                        }
+//                    }
+//                }
+//                if (!blocked)
+//                    dirlight += pointcolor.mul(geo->material().selflight);
+//            }
+//        }
+        return (basecolor + pointcolor.mul(MCRayTracing(Ray(ray.p(mint), d, ray.into), tracetime + 1, Xi)));
     }
-    else if (mingeo->material().type == SPEC) {
+    else if (raytype == SPEC) {
         Vec3d nv = mingeo->n_vec(ray, mint);
-        Ray refray(ray.p(mint), ray.d - 2 * nv.dot(ray.d) * nv);
-        return (mingeo->material().selflight + pointcolor.mul(MCRayTracing(refray, tracetime + 1, Xi)));
+        Ray refray(ray.p(mint), ray.d - 2 * nv.dot(ray.d) * nv, ray.into);
+        return (basecolor + pointcolor.mul(MCRayTracing(refray, tracetime + 1, Xi)));
     }
-    else if (mingeo->material().type == REFR) {
+    else if (raytype == REFR) {
         Vec3d nv = mingeo->n_vec(ray, mint);
-        Ray reflray(ray.p(mint), ray.d - 2 * nv.dot(ray.d) * nv);
-        bool into = mingeo->go_in(ray);
+        Ray reflray(ray.p(mint), ray.d - 2 * nv.dot(ray.d) * nv, ray.into);
+        bool into = ray.into;
         double nr = (into) ? 1.0/mingeo->material().nf : mingeo->material().nf;
         if (nr > 1) {
             double ndotr = nv.dot(ray.d);
             if (ndotr * ndotr + (1.0 / nr) * (1.0 / nr) <= 1)
-                return (mingeo->material().selflight + pointcolor.mul(MCRayTracing(reflray, tracetime + 1, Xi)));
+                return (basecolor + pointcolor.mul(MCRayTracing(reflray, tracetime + 1, Xi)));
         }
         double cosin = -ray.d.dot(nv);
         Vec3d newd = normalize(nr * (ray.d + nv * cosin) - nv * sqrt(1 - nr * nr * (1 - cosin * cosin)));
@@ -99,8 +147,8 @@ Vec3d Scene::MCRayTracing(const Ray &ray, int tracetime, unsigned short* Xi) {
         double Frt = f0 + (1 - f0) * c*c*c*c*c;
         double chooser = erand48(Xi);
         if (chooser < Frt)
-            return (mingeo->material().selflight + pointcolor.mul(MCRayTracing(reflray, tracetime + 1, Xi)));
+            return (basecolor + pointcolor.mul(MCRayTracing(reflray, tracetime + 1, Xi)));
         else
-            return (mingeo->material().selflight + pointcolor.mul(MCRayTracing(Ray(newo, newd), tracetime + 1, Xi)));
+            return (basecolor + pointcolor.mul(MCRayTracing(Ray(newo, newd, !ray.into), tracetime + 1, Xi)));
     }
 }

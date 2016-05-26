@@ -7,12 +7,13 @@ using cv::Point3d;
 
 class Ray {
 public:
-    Ray(const Point3d& p, const Vec3d& dd) : o(p), d(cv::normalize(dd)) {}
+    Ray(const Point3d& p, const Vec3d& dd, bool into = true) : o(p), d(cv::normalize(dd)), into(into) {}
     Point3d o;
     Vec3d d;
     const Point3d p(double t) const {
         return o + Point3d(t * d);
     }
+    bool into;
 };
 
 class Camera {
