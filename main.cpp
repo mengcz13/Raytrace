@@ -2,6 +2,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <sys/time.h>
+#include <cstdlib>
 #include "camera.h"
 #include "geometry.h"
 #include "scene.h"
@@ -17,19 +18,21 @@ int main(int argc, char** argv)
 {
     Vec3d f = Vec3d(0, 1, 0);
     Vec3d right = f.cross(Vec3d(0, 0, 1));
-    Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 18/32.0, 18);
+    Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 18/32000.0, 18);
     Scene scene(Point3d(0, 0, 3));
     // Plain* plain = new Plain(Vec3d(0, 1, 0), Point3d(0, 6, 0), SQUARE_WALL);
-    Rectangle* plain = new Rectangle(Point3d(-6, 6, 6), Point3d(6, 6, 6),Point3d(6, 6, -6), Point3d(-6, 6, -6), PIC_WALL, "ussr2.png");
-    Plain* plain2 = new Plain(Vec3d(0, 0, 1), Point3d(0, 0, 6), WHITE_WALL);
-    Rectangle* plain3 = new Rectangle(Point3d(-6, 6, -6), Point3d(6, 6, -6), Point3d(6, -20, -6), Point3d(-6, -20, -6), PIC_FLOOR, "wood2.jpg");
-    Plain* plain4 = new Plain(Vec3d(1, 0, 0), Point3d(6, 0, 0), BLUE_WALL);
-    Plain* plain5 = new Plain(Vec3d(1, 0, 0), Point3d(-6, 0, 0), RED_WALL);
-    Plain* plain6 = new Plain(Vec3d(0, 1, 0), Point3d(0, -25, 0), WHITE_WALL);
-    // Sphere* sphere = new Sphere(Point3d(2, -2, -6+2.3), 2.3, BALL_material_REFR);
-    Sphere* sphere = new Sphere(Point3d(2, -2, -6+1.5), 1.5, BALL_material_REFR);
-    Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -6+2+6), 2, PIC_BALL, "world-physical-map.jpg");
-    Rectangle* spherelight = new Rectangle(Point3d(-2, 2, 5.999), Point3d(2, 2, 5.999),Point3d(2, -2, 5.999),Point3d(-2, -2, 5.999), LIGHT_material);
+    Rectangle* plain = new Rectangle(Point3d(-6, 6, 6), Point3d(6, 6, 6),Point3d(6, 6, -6), Point3d(-6, 6, -6), &PIC_WALL, "ussr2.png");
+    Plain* plain2 = new Plain(Vec3d(0, 0, 1), Point3d(0, 0, 6), &WHITE_WALL);
+    Rectangle* plain3 = new Rectangle(Point3d(-6, 6, -6), Point3d(6, 6, -6), Point3d(6, -20, -6), Point3d(-6, -20, -6), &PIC_FLOOR, "wood2.jpg");
+    Plain* plain4 = new Plain(Vec3d(1, 0, 0), Point3d(6, 0, 0), &BLUE_WALL);
+    Plain* plain5 = new Plain(Vec3d(1, 0, 0), Point3d(-6, 0, 0), &RED_WALL);
+    Plain* plain6 = new Plain(Vec3d(0, 1, 0), Point3d(0, -25, 0), &WHITE_WALL);
+    Sphere* sphere = new Sphere(Point3d(2, -2, -6+4), 1.5, &BALL_material_REFR);
+    Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -6+2+5), 2, &PIC_BALL, "world-physical-map.jpg");
+    Rectangle* spherelight = new Rectangle(Point3d(-2, 2, 5.999), Point3d(2, 2, 5.999),Point3d(2, -2, 5.999),Point3d(-2, -2, 5.999), &LIGHT_material);
+    Block* block = new Block(Point3d(-3, 2.5 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 5, &MARBLE_BLOCK, "marble2.jpg");
+    Block* block2 = new Block(Point3d(2, -2 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 2.5, &MARBLE_BLOCK, "marble2.jpg");
+    ComplexObj* cobj = new ComplexObj(Point3d(-1, -3, -4), 5, "kitten.50k.obj", &WHITE_WALL);
     scene.AddGeometry(plain);
     scene.AddGeometry(plain2);
     scene.AddGeometry(plain3);
@@ -39,10 +42,14 @@ int main(int argc, char** argv)
     scene.AddGeometry(sphere);
     scene.AddGeometry(sphere2);
     scene.AddGeometry(spherelight);
-    Mat pic(512, 512, CV_64FC3);
+    scene.AddGeometry(block);
+    scene.AddGeometry(block2);
+    scene.AddGeometry(cobj);
+    int picsize = atoi(argv[2]);
+    Mat pic(picsize, picsize, CV_64FC3);
     const double dx[4] = {0, 0.5, 0, 0.5};
     const double dy[4] = {0, 0, 0.5, 0.5};
-    const int samplenum = 100; const double piecesample = 1.0 / samplenum;
+    const int samplenum = atoi(argv[1]); const double piecesample = 1.0 / samplenum;
     int finished_pixel = 0;
     timeval starttime, endtime; double timeuse = 0, timeleft = 0, percentf = 0; int hour = 0, minute = 0;
     gettimeofday(&starttime, NULL);

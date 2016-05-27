@@ -17,7 +17,7 @@ public:
             delete geometry_vec[i];
     }
 
-    Vec3d RayTracing(const Ray& ray, double weight = MINWEIGHT, int tracetime = MAXTIME);
+    // Vec3d RayTracing(const Ray& ray, double weight = MINWEIGHT, int tracetime = MAXTIME);
     Vec3d MCRayTracing(const Ray& ray, int tracetime, unsigned short* Xi);
     void AddGeometry(const Geometry* geo) {
         geometry_vec.push_back(geo);
