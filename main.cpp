@@ -32,7 +32,7 @@ int main(int argc, char** argv)
     Rectangle* spherelight = new Rectangle(Point3d(-2, 2, 5.999), Point3d(2, 2, 5.999),Point3d(2, -2, 5.999),Point3d(-2, -2, 5.999), &LIGHT_material);
     Block* block = new Block(Point3d(-3, 2.5 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 5, &MARBLE_BLOCK, "marble2.jpg");
     Block* block2 = new Block(Point3d(2, -2 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 2.5, &MARBLE_BLOCK, "marble2.jpg");
-    ComplexObj* cobj = new ComplexObj(Point3d(-1, -3, -4), 5, "kitten.50k.obj", &WHITE_WALL);
+    ComplexObj* cobj = new ComplexObj(Point3d(-1, -3, -4), 5, "fixed.perfect.dragon.100K.0.07.obj", &RED_GLASS);
     scene.AddGeometry(plain);
     scene.AddGeometry(plain2);
     scene.AddGeometry(plain3);

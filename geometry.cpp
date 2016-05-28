@@ -279,7 +279,7 @@ ComplexObj::ComplexObj(const cv::Point3d &o, double scaleto, string objfile, con
     root->box = Block(newo, Vec3d(1, 0, 0), Vec3d(0, 1, 0), prange[0][1] - prange[0][0], prange[1][1] - prange[1][0], prange[2][1] - prange[2][0]);
     for (int i = 0; i < face_vec.size(); ++i)
         root->triangle_vec.push_back(&face_vec[i]);
-    root->divide_axis = 0;
+    root->depth = 0;
     build_kdtree(root);
 }
 
@@ -315,6 +315,7 @@ void ComplexObj::parser(string objfile, double scaleto) {
         else if (buffer[0] == 'f') {
             vector<int> temp(3, 0);
             sscanf(buffer, "f %d %d %d", &temp[0], &temp[1], &temp[2]);
+            temp[0] -= 1; temp[1] -= 1; temp[2] -= 1;
             vnum.push_back(vector<int>(temp));
         }
     }
@@ -339,50 +340,54 @@ void ComplexObj::parser(string objfile, double scaleto) {
 
 void ComplexObj::build_kdtree(KdTreeNode* node) {
 
-    if (node->triangle_vec.size() < 5) {
-        node->triangle_left = node->triangle_vec;
+    if (node->triangle_vec.size() < 8 || node->depth > 16) {
+        // node->triangle_left = node->triangle_vec;
         return;
     }
-    int next_div = (node->divide_axis + 1) % 3;
+    int divide_axis = node->depth % 3;
     node->lc = &nodepool[top++];
     node->rc = &nodepool[top++];
-    node->lc->divide_axis = node->rc->divide_axis = next_div;
+    node->lc->depth = node->rc->depth = node->depth + 1;
     Block& block = node->box;
     double pivot = 0;
-    if (node->divide_axis == 0) {
+    if (divide_axis == 0) {
         sort(node->triangle_vec.begin(), node->triangle_vec.end(), Triangle_by_xmid());
-        pivot = node->triangle_vec[node->triangle_vec.size() / 2]->mid_v(node->divide_axis);
+        pivot = node->triangle_vec[node->triangle_vec.size() / 2]->mid_v(divide_axis);
+        //pivot = block.o.x + 0.5 * block.xrange;
         Vec3d moveax = Vec3d(1, 0, 0);
         node->lc->box = Block(block.o, block.xaxis, block.yaxis, pivot - block.o.x, block.yrange, block.zrange);
         node->rc->box = Block(block.o + Point3d(moveax * (pivot - block.o.x)), block.xaxis, block.yaxis, block.xrange - (pivot - block.o.x), block.yrange, block.zrange);
     }
-    else if (node->divide_axis == 1) {
+    else if (divide_axis == 1) {
         sort(node->triangle_vec.begin(), node->triangle_vec.end(), Triangle_by_ymid());
-        pivot = node->triangle_vec[node->triangle_vec.size() / 2]->mid_v(node->divide_axis);
+        pivot = node->triangle_vec[node->triangle_vec.size() / 2]->mid_v(divide_axis);
+        //pivot = block.o.y + 0.5 * block.yrange;
         Vec3d moveax = Vec3d(0, 1, 0);
         node->lc->box = Block(block.o, block.xaxis, block.yaxis, block.xrange, pivot - block.o.y, block.zrange);
         node->rc->box = Block(block.o + Point3d(moveax * (pivot - block.o.y)), block.xaxis, block.yaxis, block.xrange, block.yrange - (pivot - block.o.y), block.zrange);
     }
-    else if (node->divide_axis == 2) {
+    else if (divide_axis == 2) {
         sort(node->triangle_vec.begin(), node->triangle_vec.end(), Triangle_by_zmid());
-        pivot = node->triangle_vec[node->triangle_vec.size() / 2]->mid_v(node->divide_axis);
+        pivot = node->triangle_vec[node->triangle_vec.size() / 2]->mid_v(divide_axis);
+        //pivot = block.o.z + 0.5 * block.zrange;
         Vec3d moveax = Vec3d(0, 0, 1);
         node->lc->box = Block(block.o, block.xaxis, block.yaxis, block.xrange, block.yrange, pivot - block.o.z);
         node->rc->box = Block(block.o + Point3d(moveax * (pivot - block.o.z)), block.xaxis, block.yaxis, block.xrange, block.yrange, block.zrange - (pivot - block.o.z));
     }
-    //std::cout << pivot << ' ' << node->divide_axis << std::endl;
+    //std::cout << pivot << ' ' << divide_axis << std::endl;
     //std::cout << block.xrange << std::endl;
     for (int i = 0; i < node->triangle_vec.size(); ++i) {
         Triangle* pt = node->triangle_vec[i];
-        if (pt->mid_v(node->divide_axis) < pivot)
+        if (pt->axis_max(divide_axis) < pivot)
             node->lc->triangle_vec.push_back(pt);
-        else if (pt->mid_v(node->divide_axis) > pivot)
+        else if (pt->axis_min(divide_axis) > pivot)
             node->rc->triangle_vec.push_back(pt);
         else {
-            node->triangle_left.push_back(pt);
+            node->lc->triangle_vec.push_back(pt);
+            node->rc->triangle_vec.push_back(pt);
         }
     }
-    // std::cout << node->triangle_vec.size() << ' ' << node->lc->triangle_vec.size() << ' ' << node->rc->triangle_vec.size() << ' ' << node->triangle_left.size() << std::endl;
+    //std::cout << node->triangle_vec.size() << ' ' << node->lc->triangle_vec.size() << ' ' << node->rc->triangle_vec.size() << std::endl;
     build_kdtree(node->lc);
     build_kdtree(node->rc);
 }
@@ -398,78 +403,43 @@ double ComplexObj::search_kdtree(const Ray &ray, const Geometry **unitgeo, const
         *unitgeo = NULL;
         return -1;
     }
-//    else if (node->lc == NULL && node->rc == NULL) {
-//        const Geometry* markp = NULL; double mint = 1e10; const Geometry* rec = NULL;
-//        for (int i = 0; i < node->triangle_vec.size(); ++i) {
-//            double tt = node->triangle_vec[i]->intersect(ray, &markp);
-//            if (tt > 0 && tt < mint) {
-//                mint = tt;
-//                rec = markp;
-//            }
-//        }
-//        if (rec == NULL) {
-//            *unitgeo = NULL;
-//            return -1;
-//        }
-//        else {
-//            *unitgeo = rec;
-//            return mint;
-//        }
-//    }
-//    else {
-//        const Geometry* lres = NULL; const Geometry* rres = NULL;
-//        double lt = search_kdtree(ray, &lres, node->lc);
-//        double rt = search_kdtree(ray, &rres, node->rc);
-//        if (lt > 0 && rt > 0) {
-//            if (lt < rt) {
-//                *unitgeo = lres;
-//                return lt;
-//            }
-//            else {
-//                *unitgeo = rres;
-//                return rt;
-//            }
-//        }
-//        else if (lt > 0) {
-//            *unitgeo = lres;
-//            return lt;
-//        }
-//        else if (rt > 0) {
-//            *unitgeo = rres;
-//            return rt;
-//        }
-//        else {
-//            *unitgeo = NULL;
-//            return -1;
-//        }
-//    }
-    else {
+    else if (node->lc == NULL && node->rc == NULL) {
         const Geometry* markp = NULL; double mint = 1e10; const Geometry* rec = NULL;
-        for (int i = 0; i < node->triangle_left.size(); ++i) {
-            double tt = node->triangle_left[i]->intersect(ray, &markp);
+        for (int i = 0; i < node->triangle_vec.size(); ++i) {
+            double tt = node->triangle_vec[i]->intersect(ray, &markp);
             if (tt > 0 && tt < mint) {
                 mint = tt;
                 rec = markp;
             }
         }
         if (rec == NULL) {
-            mint = -1;
+            *unitgeo = NULL;
+            return -1;
         }
-        const Geometry* lres = NULL; const Geometry* rres = NULL;
-        double lt = -1, rt = -1;
-        if (node->lc)
-            lt = search_kdtree(ray, &lres, node->lc);
-        if (node->rc)
-            rt = search_kdtree(ray, &rres, node->rc);
-        if (mint > 0 && (mint < lt || lt < 0) && (mint < rt || rt < 0)) {
+        else {
             *unitgeo = rec;
             return mint;
         }
-        else if (lt > 0 && (lt < mint || mint < 0) && (lt < rt || rt < 0)) {
+    }
+    else {
+        const Geometry* lres = NULL; const Geometry* rres = NULL;
+        double lt = search_kdtree(ray, &lres, node->lc);
+        double rt = search_kdtree(ray, &rres, node->rc);
+        if (lt > 0 && rt > 0) {
+            if (lt < rt) {
+                *unitgeo = lres;
+                return lt;
+            }
+            else {
+                *unitgeo = rres;
+                return rt;
+            }
+        }
+        else if (lt > 0) {
             *unitgeo = lres;
             return lt;
         }
-        else if (rt > 0 && (rt < mint || mint < 0) && (rt < lt || lt < 0)) {
+        else if (rt > 0) {
             *unitgeo = rres;
             return rt;
         }
@@ -478,4 +448,39 @@ double ComplexObj::search_kdtree(const Ray &ray, const Geometry **unitgeo, const
             return -1;
         }
     }
+//    else {
+//        const Geometry* markp = NULL; double mint = 1e10; const Geometry* rec = NULL;
+//        for (int i = 0; i < node->triangle_left.size(); ++i) {
+//            double tt = node->triangle_left[i]->intersect(ray, &markp);
+//            if (tt > 0 && tt < mint) {
+//                mint = tt;
+//                rec = markp;
+//            }
+//        }
+//        if (rec == NULL) {
+//            mint = -1;
+//        }
+//        const Geometry* lres = NULL; const Geometry* rres = NULL;
+//        double lt = -1, rt = -1;
+//        if (node->lc)
+//            lt = search_kdtree(ray, &lres, node->lc);
+//        if (node->rc)
+//            rt = search_kdtree(ray, &rres, node->rc);
+//        if (mint > 0 && (mint < lt || lt < 0) && (mint < rt || rt < 0)) {
+//            *unitgeo = rec;
+//            return mint;
+//        }
+//        else if (lt > 0 && (lt < mint || mint < 0) && (lt < rt || rt < 0)) {
+//            *unitgeo = lres;
+//            return lt;
+//        }
+//        else if (rt > 0 && (rt < mint || mint < 0) && (rt < lt || lt < 0)) {
+//            *unitgeo = rres;
+//            return rt;
+//        }
+//        else {
+//            *unitgeo = NULL;
+//            return -1;
+//        }
+//    }
 }

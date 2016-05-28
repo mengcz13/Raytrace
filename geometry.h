@@ -58,6 +58,15 @@ const Material WHITE_WALL = {
     PURE
 };
 
+const Material RED_GLASS = {
+    1.5,
+    Vec3d(0.05, 0.05, 0.85),
+    Vec3d(0, 0, 0),
+    MIXED,
+    PURE,
+    Vec3d(0.05, 0.15, 0.8)
+};
+
 const Material MARBLE_BLOCK = {
     1,
     Vec3d(0.95, 0.95, 0.95),
@@ -280,8 +289,8 @@ struct KdTreeNode {
     std::vector<Triangle*> triangle_left;
     KdTreeNode* lc;
     KdTreeNode* rc;
-    int divide_axis; // 0: x 1: y 2: z
-    KdTreeNode(): lc(NULL), rc(NULL), divide_axis(0) {}
+    int depth; // 0: x 1: y 2: z
+    KdTreeNode(): lc(NULL), rc(NULL), depth(0) {}
 };
 
 class ComplexObj : public Geometry {
@@ -296,7 +305,7 @@ public:
 
 private:
     std::vector<Point3d> vertex_vec;
-    std::vector<std::vector<int>> vnum;
+    std::vector<std::vector<int> > vnum;
     std::vector<Triangle> face_vec;
     Point3d o; // center of object
     KdTreeNode* root;
