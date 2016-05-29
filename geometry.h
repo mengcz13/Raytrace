@@ -60,11 +60,11 @@ const Material WHITE_WALL = {
 
 const Material RED_GLASS = {
     1.5,
-    Vec3d(0.05, 0.05, 0.85),
+    Vec3d(0.05, 0.05, 0.95),
     Vec3d(0, 0, 0),
     MIXED,
     PURE,
-    Vec3d(0.05, 0.15, 0.8)
+    Vec3d(0.01, 0.04, 0.95)
 };
 
 const Material MARBLE_BLOCK = {
@@ -142,7 +142,7 @@ public:
             }
         }
     }
-    virtual double intersect(const Ray& ray, Geometry const ** unitgeo) const = 0;
+    virtual double intersect(const Ray& ray, Geometry const ** unitgeo, double& current_mint) const = 0;
     virtual Vec3d color(const Ray& ray, const Point3d& point, const Ray& out, const Vec3d& outI, const Vec3d& envI, const cv::Vec3d &nv, const Geometry *unitgeo) const;
     virtual Vec3d n_vec(const Ray& ray, const Point3d& point) const = 0;
     virtual Vec3d texture(const Point3d& point, Geometry const* unitgeo) const {
@@ -184,7 +184,7 @@ public:
     Plain(const Vec3d& v, const Point3d& p, const Material* mate = NULL, string picname = "") : n(normalize(v)), o(p), Geometry(mate, picname) {
         d = -n.dot(o);
     }
-    virtual double intersect(const Ray& ray, Geometry const** unitgeo) const;
+    virtual double intersect(const Ray& ray, Geometry const** unitgeo, double& current_mint) const;
     Vec3d n_vec(const Ray& ray, const Point3d& point) const;
     virtual Vec3d texture(const Point3d& point, Geometry const* unitgeo) const {
         return this->mate->Kds;
@@ -198,7 +198,7 @@ protected:
 class Sphere : public Geometry {
 public:
     Sphere(const Point3d& center, const double ra, const Material* mate = NULL, string picname = "") : o(center), r(ra), Geometry(mate, picname) {}
-    double intersect(const Ray& ray, Geometry const** unitgeo) const;
+    double intersect(const Ray& ray, Geometry const** unitgeo, double& current_mint) const;
     Vec3d n_vec(const Ray &ray, const Point3d& point) const;
     // bool go_in(const Ray &ray) const;
     void rxy(const Point3d& p, double& x, double& y) const;
@@ -218,7 +218,7 @@ public:
     }
     Rectangle(const Point3d& op, const Vec3d& xx, const Vec3d& yy, double xr, double yr, const Material* mate = NULL, string picname = ""): xaxis(normalize(xx)), yaxis(normalize(yy)), xrange(xr), yrange(yr), Plain(xx.cross(yy), op, mate, picname) {}
     Rectangle(): Plain(Point3d(0, 0, 0), Vec3d(0, 0, 0)) {}
-    double intersect(const Ray &ray, Geometry const** unitgeo) const;
+    double intersect(const Ray &ray, Geometry const** unitgeo, double& current_mint) const;
     // Vec3d n_vec(const Ray &ray, const Point3d& point) const;
     Vec3d texture(const Point3d& point, Geometry const* unitgeo) const;
     void rxy(const Point3d& xy, double& x, double& y) const;
@@ -245,7 +245,7 @@ public:
         face[5] = Rectangle(f2fo, - xaxis, - yaxis, xrange, yrange);
     }
     Block(): Geometry() {}
-    double intersect(const Ray &ray, Geometry const** unitgeo) const;
+    double intersect(const Ray &ray, Geometry const** unitgeo, double& current_mint) const;
     Vec3d n_vec(const Ray &ray, const Point3d& point) const { std::cerr << "Wrong!" << std::endl; return Vec3d(0, 0, 0); } // Never use it
     Vec3d texture(const Point3d& point, Geometry const* unitgeo) const;
 // private:
@@ -262,7 +262,7 @@ public:
 class Triangle : public Geometry {
 public:
     Triangle(const Point3d& p1, const Point3d& p2, const Point3d& p3, const Material* mate = NULL, string picname = "");
-    double intersect(const Ray &ray, Geometry const** unitgeo) const;
+    double intersect(const Ray &ray, Geometry const** unitgeo, double& current_mint) const;
     Vec3d n_vec(const Ray &ray, const Point3d& point) const;
     Vec3d texture(const Point3d& point, Geometry const* unitgeo) const;
     double axis_max(int i) {
@@ -286,7 +286,7 @@ private:
 struct KdTreeNode {
     Block box;
     std::vector<Triangle*> triangle_vec;
-    std::vector<Triangle*> triangle_left;
+    //std::vector<Triangle*> triangle_left;
     KdTreeNode* lc;
     KdTreeNode* rc;
     int depth; // 0: x 1: y 2: z
@@ -299,7 +299,7 @@ public:
     ~ComplexObj() {
         delete []nodepool;
     }
-    double intersect(const Ray &ray, const Geometry **unitgeo) const;
+    double intersect(const Ray &ray, const Geometry **unitgeo, double& current_mint) const;
     Vec3d n_vec(const Ray &ray, const cv::Point3d &point) const;
     Vec3d texture(const cv::Point3d &point, const Geometry *unitgeo) const;
 
@@ -314,7 +314,7 @@ private:
     double prange[3][2];
     void parser(string objfile, double scaleto);
     void build_kdtree(KdTreeNode* node);
-    double search_kdtree(const Ray& ray, const Geometry **unitgeo, const KdTreeNode* node) const;
+    double search_kdtree(const Ray& ray, const Geometry **unitgeo, const KdTreeNode* node, double& current_mint) const;
 };
 
 struct Triangle_by_xmid {

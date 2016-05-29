@@ -5,11 +5,13 @@ Vec3d Scene::MCRayTracing(const Ray &ray, int tracetime, unsigned short* Xi) {
     double mint = 1e10;
     const Geometry* mingeo = NULL;
     const Geometry* fathergeo = NULL;
+    double current_mint = mint;
     for (int i = 0; i < geometry_vec.size(); ++i) {
         Geometry const* unitgeo = NULL;
-        double t = geometry_vec[i]->intersect(ray, &unitgeo);
+        double t = geometry_vec[i]->intersect(ray, &unitgeo, current_mint);
         if (t > 0 && t < mint) {
             mint = t;
+            current_mint = mint;
             mingeo = unitgeo;
             fathergeo = geometry_vec[i];
         }
