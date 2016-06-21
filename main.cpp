@@ -18,7 +18,8 @@ int main(int argc, char** argv)
 {
     Vec3d f = Vec3d(0, 1, 0);
     Vec3d right = f.cross(Vec3d(0, 0, 1));
-    Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 18/32000.0, 18);
+    // Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 22.5/32.0, 22.5);
+    Camera camera(Point3d(0, -20, 0), f, right, M_PI / 4, 0, 22.5);
     Scene scene(Point3d(0, 0, 3));
     // Plain* plain = new Plain(Vec3d(0, 1, 0), Point3d(0, 6, 0), SQUARE_WALL);
     Rectangle* plain = new Rectangle(Point3d(-6, 6, 6), Point3d(6, 6, 6),Point3d(6, 6, -6), Point3d(-6, 6, -6), &PIC_WALL, "ussr2.png");
@@ -28,11 +29,12 @@ int main(int argc, char** argv)
     Plain* plain5 = new Plain(Vec3d(1, 0, 0), Point3d(-6, 0, 0), &RED_WALL);
     Plain* plain6 = new Plain(Vec3d(0, 1, 0), Point3d(0, -25, 0), &WHITE_WALL);
     //Sphere* sphere = new Sphere(Point3d(2, -2, -6+4), 1.5, &BALL_material_REFR);
-    Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -6+2+5), 2, &PIC_BALL, "world-physical-map.jpg");
+    //Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -6+2+5), 2, &PIC_BALL, "world-physical-map.jpg");
     Rectangle* spherelight = new Rectangle(Point3d(-2, 2, 5.999), Point3d(2, 2, 5.999),Point3d(2, -2, 5.999),Point3d(-2, -2, 5.999), &LIGHT_material);
-    Block* block = new Block(Point3d(-3, 2.5 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 5, &MARBLE_BLOCK, "marble2.jpg");
+    //Block* block = new Block(Point3d(-3, 2.5 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 5, &MARBLE_BLOCK, "marble2.jpg");
     //Block* block2 = new Block(Point3d(2, -2 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 2.5, &MARBLE_BLOCK, "marble2.jpg");
-    ComplexObj* cobj = new ComplexObj(Point3d(1, 0, -3), 8, "fixed.perfect.dragon.100K.0.07.obj", &RED_GLASS);
+    //ComplexObj* cobj = new ComplexObj(Point3d(1, -2, -3), 8, "fixed.perfect.dragon.100K.0.07.obj", &RED_GLASS);
+    ComplexObj* cobj = new ComplexObj(Point3d(1, -2, -3), 8, "dragonp5.obj", &RED_WALL);
 //    ComplexObj* cobj = new ComplexObj(Point3d(0, 0, 0), 8, "dinosaur.2k.obj", &RED_GLASS);
     scene.AddGeometry(plain);
     scene.AddGeometry(plain2);
@@ -41,9 +43,9 @@ int main(int argc, char** argv)
     scene.AddGeometry(plain5);
     scene.AddGeometry(plain6);
     //scene.AddGeometry(sphere);
-    scene.AddGeometry(sphere2);
+    //scene.AddGeometry(sphere2);
     scene.AddGeometry(spherelight);
-    scene.AddGeometry(block);
+    //scene.AddGeometry(block);
     //scene.AddGeometry(block2);
     scene.AddGeometry(cobj);
     int picsize = atoi(argv[2]);
@@ -71,18 +73,18 @@ int main(int argc, char** argv)
                 }
                 p[j] += truncvec(tempv) * 0.25;
             }
-#pragma omp critical
-            {
-                ++finished_pixel;
-                if (finished_pixel % 10 == 0) {
-                    gettimeofday(&endtime, NULL);
-                    timeuse = endtime.tv_sec - starttime.tv_sec + (endtime.tv_usec - starttime.tv_usec) / 1000000.0;
-                    percentf = (double)finished_pixel / (double)(pic.rows * pic.cols);
-                    timeleft = timeuse * (1.0 / percentf - 1);
-                    printf("Finished %.2f%% ...    time usage: %dh%dm%ds    timeleft: %dh%dm%ds      \r", percentf * 100.0, (int)timeuse/3600, ((int)(timeuse)%3600)/60, ((int)(timeuse)%3600)%60, (int)timeleft/3600, ((int)(timeleft)%3600)/60, ((int)(timeleft)%3600)%60);
-                    fflush(stdout);
-                }
-            }
+//#pragma omp critical
+//            {
+//                ++finished_pixel;
+//                if (finished_pixel % 10 == 0) {
+//                    gettimeofday(&endtime, NULL);
+//                    timeuse = endtime.tv_sec - starttime.tv_sec + (endtime.tv_usec - starttime.tv_usec) / 1000000.0;
+//                    percentf = (double)finished_pixel / (double)(pic.rows * pic.cols);
+//                    timeleft = timeuse * (1.0 / percentf - 1);
+//                    printf("Finished %.2f%% ...    time usage: %dh%dm%ds    timeleft: %dh%dm%ds      \r", percentf * 100.0, (int)timeuse/3600, ((int)(timeuse)%3600)/60, ((int)(timeuse)%3600)%60, (int)timeleft/3600, ((int)(timeleft)%3600)/60, ((int)(timeleft)%3600)%60);
+//                    fflush(stdout);
+//                }
+//            }
         }
     }
     Mat picpng;
