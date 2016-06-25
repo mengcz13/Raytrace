@@ -41,7 +41,8 @@ Vec3d Scene::MCRayTracing(const Ray &ray, int tracetime, unsigned short* Xi) {
 //                    for (int j = 0; j < geometry_vec.size(); ++j) {
 //                        if ((geometry_vec[j]) != (geo)) {
 //                            Geometry const* temp = NULL;
-//                            double testlight = geometry_vec[j]->intersect(light, &temp);
+//                            double maxd = 1e10;
+//                            double testlight = geometry_vec[j]->intersect(light, &temp, maxd);
 //                            if (testlight > 0 && testlight < targett) {
 //                                blocked = true;
 //                                break;
