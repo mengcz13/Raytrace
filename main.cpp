@@ -32,9 +32,14 @@ int main(int argc, char** argv)
     Sphere* sphere2 = new Sphere(Point3d(-3, 2.5, -6+2+5), 2, &PIC_BALL, "world-physical-map.jpg");
     Rectangle* spherelight = new Rectangle(Point3d(-2, 2, 5.999), Point3d(2, 2, 5.999),Point3d(2, -2, 5.999),Point3d(-2, -2, 5.999), &LIGHT_material);
     Block* block = new Block(Point3d(-3, 2.5 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 5, &MARBLE_BLOCK, "marble2.jpg");
+<<<<<<< HEAD
     Block* block2 = new Block(Point3d(2, -2 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 2.5, &MARBLE_BLOCK, "marble2.jpg");
     //ComplexObj* cobj = new ComplexObj(Point3d(1, -2, -3), 8, "fixed.perfect.dragon.100K.0.07.obj", &RED_GLASS);
 //    ComplexObj* cobj = new ComplexObj(Point3d(1, -2, -3), 8, "dragonp5.obj", &RED_WALL);
+=======
+    //Block* block2 = new Block(Point3d(2, -2 - 2.0 / sqrt(2.0), -6), Vec3d(1, 1, 0), Vec3d(-1, 1, 0), 2, 2, 2.5, &MARBLE_BLOCK, "marble2.jpg");
+    ComplexObj* cobj = new ComplexObj(Point3d(1, -2, -3), 8, "fixed.perfect.dragon.100K.0.07.obj", &RED_GLASS);
+>>>>>>> f40f3030079e3735a9f4cb4328815d1bd09a2ddc
 //    ComplexObj* cobj = new ComplexObj(Point3d(0, 0, 0), 8, "dinosaur.2k.obj", &RED_GLASS);
     scene.AddGeometry(plain);
     scene.AddGeometry(plain2);
@@ -56,12 +61,16 @@ int main(int argc, char** argv)
     int finished_pixel = 0;
     timeval starttime, endtime; double timeuse = 0, timeleft = 0, percentf = 0; int hour = 0, minute = 0;
     gettimeofday(&starttime, NULL);
-#pragma omp parallel for schedule(dynamic, 1) shared(finished_pixel, starttime, endtime, timeuse, timeleft, hour, minute)
+
+    printf("PRE CALCULATION...\n");
+    // Pre calc
+#pragma omp parallel for schedule(dynamic, 1)// shared(finished_pixel, starttime, endtime, timeuse, timeleft, hour, minute, pic)
     for (int i = 0; i < pic.rows; ++i) {
         unsigned short Xi[3] = {0, 0, i * i * i};
         for (int j = 0; j < pic.cols; ++j) {
             Vec3d*p = pic.ptr<Vec3d>(i);
             p[j] = Vec3d(0, 0, 0);
+<<<<<<< HEAD
             for (int k = 0; k < 4; ++k) {
                 Vec3d tempv(0, 0, 0);
                 double x = ((double)j + dx[k]) / pic.cols;
@@ -72,7 +81,17 @@ int main(int argc, char** argv)
                     tempv += (scene.MCRayTracing(camera.ray_direction(sx, sy, Xi), 0, Xi) * piecesample);
                 }
                 p[j] += truncvec(tempv) * 0.25;
+=======
+            Vec3d tempv(0, 0, 0);
+            double x = ((double)j) / pic.cols;
+            double y = ((double)i) / pic.rows;
+            for (int snum = 0; snum < samplenum; ++snum) {
+                double sx = x + (erand48(Xi) / (pic.cols));
+                double sy = y + (erand48(Xi) / (pic.rows));
+                tempv += ((scene.MCRayTracing(camera.ray_direction(sx, sy, Xi), 0, Xi)) * piecesample);
+>>>>>>> f40f3030079e3735a9f4cb4328815d1bd09a2ddc
             }
+            p[j] = truncvec(tempv);
 #pragma omp critical
             {
                 ++finished_pixel;
@@ -85,10 +104,87 @@ int main(int argc, char** argv)
                     fflush(stdout);
                 }
             }
+         }
+    }
+    finished_pixel = 0;
+
+    printf("\nSELECTION...\n");
+    Mat pic_subpixel(picsize, picsize, CV_64FC3);
+    pic.copyTo(pic_subpixel);
+    vector<pair<int, int> > pairvec;
+    int neix[3] = {-1, 0, 1}; int neiy[3] = {-1, 0, 1};
+#pragma omp parallel for schedule(dynamic, 1)// shared(finished_pixel, starttime, endtime, timeuse, timeleft, hour, minute, pairvec, pic)
+    for (int i = 0; i < pic.rows; ++i) {
+        for (int j = 0; j < pic.cols; ++j) {
+            Vec3d center = pic.ptr<Vec3d>(i)[j];
+            bool trans = false;
+            for (int nx = 0; nx < 3; ++nx) {
+                for (int ny = 0; ny < 3; ++ny) {
+                    int newx = i + neix[nx], newy = j + neiy[ny];
+                    if (0 <= newx && newx < pic.rows && 0 <= newy && newy < pic.cols && (nx != 0 || ny != 0)) {
+                        if (norm(center - pic.ptr<Vec3d>(newx)[newy]) > 1.3) {
+                            trans = true;
+                            break;
+                        }
+                    }
+                }
+                if (trans)
+                    break;
+            }
+            if (trans)
+#pragma omp critical
+            {
+                pairvec.push_back(pair<int, int>(i, j));
+            }
+        }
+    }
+    cout << pairvec.size() << endl;
+
+    //test
+//    for (int prank_i = 0; prank_i < pairvec.size(); ++prank_i) {
+//        int i = pairvec[prank_i].first, j = pairvec[prank_i].second;
+//        Vec3d*p = pic_subpixel.ptr<Vec3d>(i);
+//        p[j] = Vec3d(0, 1, 0);
+//    }
+//    imshow("test", pic_subpixel);
+//    waitKey(0);
+    //test end
+
+    printf("\nSUBPIXEL...\n");
+    gettimeofday(&starttime, NULL);
+    // Select special point and do subpixels
+#pragma omp parallel for schedule(dynamic, 1)// shared(finished_pixel, starttime, endtime, timeuse, timeleft, hour, minute)
+    for (int prank_i = 0; prank_i < pairvec.size(); ++prank_i) {
+        int i = pairvec[prank_i].first, j = pairvec[prank_i].second;
+        unsigned short Xi[3] = {0, 0, prank_i * prank_i * prank_i};
+        Vec3d*p = pic_subpixel.ptr<Vec3d>(i);
+        p[j] = Vec3d(0, 0, 0);
+        for (int k = 0; k < 4; ++k) {
+            Vec3d tempv(0, 0, 0);
+            double x = ((double)j + dx[k]) / pic.cols;
+            double y = ((double)i + dy[k]) / pic.rows;
+            for (int snum = 0; snum < samplenum; ++snum) {
+                double sx = x + (erand48(Xi) / (2 * pic.cols));
+                double sy = y + (erand48(Xi) / (2 * pic.rows));
+                tempv += ((scene.MCRayTracing(camera.ray_direction(sx, sy, Xi), 0, Xi)) * piecesample);
+            }
+            p[j] += truncvec(tempv) * 0.25;
+        }
+#pragma omp critical
+        {
+            ++finished_pixel;
+            if (finished_pixel % 10 == 0) {
+                gettimeofday(&endtime, NULL);
+                timeuse = endtime.tv_sec - starttime.tv_sec + (endtime.tv_usec - starttime.tv_usec) / 1000000.0;
+                percentf = (double)finished_pixel / (double)(pairvec.size());
+                timeleft = timeuse * (1.0 / percentf - 1);
+                printf("Finished %.2f%% ...    time usage: %dh%dm%ds    timeleft: %dh%dm%ds      \r", percentf * 100.0, (int)timeuse/3600, ((int)(timeuse)%3600)/60, ((int)(timeuse)%3600)%60, (int)timeleft/3600, ((int)(timeleft)%3600)/60, ((int)(timeleft)%3600)%60);
+                fflush(stdout);
+            }
         }
     }
     Mat picpng;
-    pic.convertTo(picpng, CV_16UC3, 65535.0);
+    pic_subpixel.convertTo(picpng, CV_16UC3, 65535.0);
     imwrite("result.png", picpng);
     imshow("sss", picpng);
     waitKey(0);
